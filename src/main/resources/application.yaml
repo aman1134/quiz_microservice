@@ -1,0 +1,8 @@
+server:
+  port: 8080
+  error:
+    includeMessage: always
+
+spring:
+  datasource:
+    url: jdbc:sqlite:survey_db.db
