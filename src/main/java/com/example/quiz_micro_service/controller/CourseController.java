@@ -90,7 +90,7 @@ public class CourseController {
 
         List<String> passwords = jdbcTemplate.query(
                 "Select password from Teacher where tid = '"+ tid + "'",
-                (resultSet, rowNum) -> resultSet.getString("tid")
+                (resultSet, rowNum) -> resultSet.getString("password")
         );
 
         //if there is no teacher with this tid then return false

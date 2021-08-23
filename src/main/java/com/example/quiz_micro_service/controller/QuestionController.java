@@ -1,6 +1,7 @@
 package com.example.quiz_micro_service.controller;
 
 import com.example.quiz_micro_service.request.*;
+import com.example.quiz_micro_service.response.DefaultErrorResponse;
 import com.example.quiz_microservice.response.DefaultResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -9,18 +10,21 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
 
+import javax.validation.Valid;
 import java.text.DecimalFormat;
 import java.util.*;
 
+@RestController
 public class QuestionController {
 
     @Autowired
     JdbcTemplate jdbcTemplate;
-    private final DecimalFormat decimalFormat = new DecimalFormat("###");
+    private final DecimalFormat decimalFormat = new DecimalFormat("000");
 
     @RequestMapping(value = "/question/add/", method = RequestMethod.POST)
-    public ResponseEntity addQuestion(@RequestBody QuestionRequest request){
+    public ResponseEntity addQuestion(@Valid @RequestBody QuestionRequest request){
 
         if( isTeacher( request.getId(), request.getPassword() ) ){
 
@@ -50,7 +54,7 @@ public class QuestionController {
             for(String option : options)
                 addOptionOfQuestion(new OptionRequest(request.getId(), request.getPassword(), questionID, option));
 
-            return ResponseEntity.ok( new DefaultResponse("new quiz added with qid " + questionID));
+            return ResponseEntity.ok( new DefaultResponse("new question added with qid " + questionID));
         }
         return (ResponseEntity) ResponseEntity.status(HttpStatus.FORBIDDEN);
     }
@@ -59,7 +63,7 @@ public class QuestionController {
     public ResponseEntity addTagToQuestion(@RequestBody TagRequest request){
 
         List<String> questions = jdbcTemplate.query(
-                "Select qid from Question where qid = '" + request.getQid(),
+                "Select qid from Question where qid = '" + request.getQid() + "'",
                 (resultSet, n) -> resultSet.getString("qid")
         );
 
@@ -69,7 +73,7 @@ public class QuestionController {
         //add a new tag to the Question into the Tag table
         jdbcTemplate.execute(
                 "Insert into Tag (qid, tag, points)"+
-                        "values ('" + request.getQid() + "', '" + request.getTag() + "', '" + request.getPoints() + "' )"
+                        "values ('" + request.getQid() + "', '" + request.getTag() + "', " + request.getPoints() + " )"
         );
         return ResponseEntity.ok( new DefaultResponse("new tag " + request.getTag() +" added to question qid " + request.getQid() + "successfully.") );
     }
@@ -120,20 +124,20 @@ public class QuestionController {
     }
 
 
-    @RequestMapping(value = "/question/add-answer/", method = RequestMethod.POST)
+    @RequestMapping(value = "/question/delete-answer/", method = RequestMethod.DELETE)
     public ResponseEntity deleteAnswerOfQuestion(@RequestBody AnswerRequest request){
 
         if( isTeacher( request.getId(), request.getPassword()) ) {
-            List<String> questions = jdbcTemplate.query(
-                    "Select qid from Question where qid = '" + request.getQid() + "'",
-                    (resultSet, n) -> resultSet.getString("qid")
+            List<String> answers = jdbcTemplate.query(
+                    "Select answer from Answer where qid = '" + request.getQid() + "'",
+                    (resultSet, n) -> resultSet.getString("answer")
             );
 
             //if there is no record with qid return not found http status
-            if (questions.isEmpty()) return (ResponseEntity) ResponseEntity.status(HttpStatus.NOT_FOUND);
+            if (answers.isEmpty()) return ResponseEntity.ok( new DefaultErrorResponse("not found"));
 
             //if there is only a single answer for that question it will not be deleted and semd a
-            if(questions.size() == 1) return (ResponseEntity) ResponseEntity.status(HttpStatus.valueOf("Answer cannot be deleted."));
+            if(answers.size() == 1) return ResponseEntity.ok( new DefaultErrorResponse("Answer cannot be deleted."));
 
             //add a new tag to the Question into the Tag table
             jdbcTemplate.execute(
@@ -191,7 +195,7 @@ public class QuestionController {
 
         List<String> passwords = jdbcTemplate.query(
                 "Select password from Teacher where tid = '"+ tid + "'",
-                (resultSet, rowNum) -> resultSet.getString("tid")
+                (resultSet, rowNum) -> resultSet.getString("password")
         );
 
         //if there is no teacher with this tid then return false

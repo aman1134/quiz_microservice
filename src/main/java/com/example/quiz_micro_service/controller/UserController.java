@@ -61,7 +61,7 @@ public class UserController {
 
         jdbcTemplate.execute(
                 "Insert into Teacher (tid, name, password)" +
-                        "values ('" + teacherID + "', " + user.getName() + "', '" + user.getPassword() + "' )"
+                        "values ('" + teacherID + "', '" + user.getName() + "', '" + user.getPassword() + "' )"
         );
         return ResponseEntity.ok( new DefaultResponse("new teacher account with tid " + teacherID + " created successfully.") );
     }
@@ -74,7 +74,7 @@ public class UserController {
         if( isStudent(request.id, request.password) ){
 
             List<String> courses = jdbcTemplate.query(
-                    "Select cid from Course where cid = " + request.getCid(),
+                    "Select cid from Course where cid = '" + request.getCid() + "'",
                     (resultSet, n) -> resultSet.getString("cid")
             );
 
@@ -115,7 +115,10 @@ public class UserController {
             if( qzId.isEmpty() )    return (ResponseEntity) ResponseEntity.status(HttpStatus.valueOf("No quiz associated with this course. Please contact your teacher or try again later"));
             //if quiz found
             String quizID = qzId.get(0);
-            Quiz quiz = jdbcTemplate.queryForObject( "Select * from Quiz where qid = '" + quizID + "'", Quiz.class );
+            Integer cutOff = jdbcTemplate.queryForObject( "Select cutOff from Quiz where qzid = '" + quizID + "'", Integer.class );
+            Integer maxPoints = jdbcTemplate.queryForObject( "Select maxPoints from Quiz where qzid = '" + quizID + "'", Integer.class );
+            Integer maxTime = jdbcTemplate.queryForObject( "Select maxTime from Quiz where qzid = '" + quizID + "'", Integer.class );
+            Quiz quiz = new Quiz(quizID, cutOff, maxPoints, maxTime);
 
             //if the total points of the student reached to maximum points end the quiz
             if(request.getPoints() >= quiz.getMaxPoints()){
@@ -125,7 +128,7 @@ public class UserController {
 
             //get all the questionIds of that quiz
             List<String> questionIds  = jdbcTemplate.query(
-                    "Select qid from QuizQuestion where qzid = '" + quizID +"' and difficultyLevel >= " + request.getDifficultyLevel() + " order by difficultyLevel",
+                    "Select qid from Question where difficultyLevel >= '" + request.getDifficultyLevel() +"' and qid in ( Select qid from QuizQuestion where qzid = '"  + quizID + "' ) order by difficultyLevel ",
                     (resultSet, n) -> resultSet.getString("qid")
             );
 
@@ -135,7 +138,24 @@ public class UserController {
             }
 
             //get Question from the Question table
-            Question question = jdbcTemplate.queryForObject("Select * from Question where qid = '" + questionIds.get(0) + "'", Question.class);
+            Question question = new Question();
+            String ques = jdbcTemplate.queryForObject("Select question from Question where qid = '" + questionIds.get(0) + "'", String.class);
+            List<String> answers = jdbcTemplate.query(
+                    "Select answer from Answer where qid = '" + questionIds.get(0) + "'",
+                    (res, n) -> res.getString("answer")
+            );
+            List<String> options = jdbcTemplate.query(
+                    "Select option from Option where qid = '" + questionIds.get(0) + "'",
+                    (res, n) -> res.getString("option")
+            );
+            Integer diff = jdbcTemplate.queryForObject("Select difficultyLevel from Question where qid = '" + questionIds.get(0) + "'", Integer.class);
+            Integer points = jdbcTemplate.queryForObject("Select points from Question where qid = '" + questionIds.get(0) + "'", Integer.class);
+            question.setQuestion(ques);
+            question.setAnswers(answers);
+            question.setOptions(options);
+            question.setDifficultyLevel(diff);
+            question.setPoints(points);
+            question.setQid(questionIds.get(0));
 
             return ResponseEntity.ok( question );
         }
@@ -154,7 +174,7 @@ public class UserController {
 
         //assign score to the StudentCourse Table;
         jdbcTemplate.execute(
-                "Update Course set  scid = '" + scoreId +"' where cid = '" + request.getCid() + "'"
+                "Update StudentCourse set  scid = '" + scoreId +"' where cid = '" + request.getCid() + "'"
         );
     }
 
@@ -170,7 +190,7 @@ public class UserController {
 
             //get all the questionIds of that quiz
             List<String> questionIds  = jdbcTemplate.query(
-                    "Select qid from QuizQuestion where qzid = '" + request.getQzid() +"' and difficultyLevel <= " + request.getDifficultyLevel() + " order by difficultyLevel desc",
+                    "Select qid from Question where difficultyLevel <= '" + request.getDifficultyLevel() +"' and qid in ( Select qid from QuizQuestion where qzid = '"  + request.getQzid() + "' ) order by difficultyLevel desc",
                     (resultSet, n) -> resultSet.getString("qid")
             );
 
@@ -181,83 +201,26 @@ public class UserController {
             }
 
             //get Question from the Question table
-            Question question = jdbcTemplate.queryForObject("Select * from Question where qid = '" + questionIds.get(0) + "'", Question.class);
+            Question question = new Question();
+            String ques = jdbcTemplate.queryForObject("Select question from Question where qid = '" + questionIds.get(0) + "'", String.class);
+            List<String> answers = jdbcTemplate.query(
+                    "Select answer from Answer where qid = '" + questionIds.get(0) + "'",
+                    (res, n) -> res.getString("answer")
+            );
+            List<String> options = jdbcTemplate.query(
+                    "Select option from Option where qid = '" + questionIds.get(0) + "'",
+                    (res, n) -> res.getString("option")
+            );
+            Integer diff = jdbcTemplate.queryForObject("Select difficultyLevel from Question where qid = '" + questionIds.get(0) + "'", Integer.class);
+            Integer points = jdbcTemplate.queryForObject("Select points from Question where qid = '" + questionIds.get(0) + "'", Integer.class);
+            question.setQuestion(ques);
+            question.setAnswers(answers);
+            question.setOptions(options);
+            question.setDifficultyLevel(diff);
+            question.setPoints(points);
+            question.setQid(questionIds.get(0));
 
             return ResponseEntity.ok( question );
-        }
-        return (ResponseEntity) ResponseEntity.status(HttpStatus.FORBIDDEN);
-    }
-
-    //student taking the quiz
-    @RequestMapping(value = "/take-quiz/", method = RequestMethod.POST)
-    public ResponseEntity takeQuiz(@Validated @RequestBody QuizSolution request){
-
-        if( isStudent(request.id, request.password) ){
-
-            List<String> courses = jdbcTemplate.query(
-                    "Select cid from StudentCourse where cid = '" + request.getCid() + "' and sid = '" + request.getId() + "'",
-                    (resultSet, n) -> resultSet.getString("cid")
-            );
-
-            //if there is no record with cid return not found http status
-            if(courses.isEmpty())   return (ResponseEntity) ResponseEntity.status(HttpStatus.NOT_FOUND);
-
-            //if the student has taken the course then we get the qzid from the Course table with the help of cid
-            List<String> qzId = jdbcTemplate.query(
-                    "Select qzid from Course where cid = '" + request.getCid() + "'",
-                    (resultSet, n) -> resultSet.getString("qzid")
-            );
-
-            //if there is no quiz associated with that course return a message.
-            if( qzId.isEmpty() )    return (ResponseEntity) ResponseEntity.status(HttpStatus.valueOf("No quiz associated with this course. Please contact your teacher or try again later"));
-            //if quiz found
-            String quizID = qzId.get(0);
-
-            //get all the question of that quiz
-            List<String> questionIds  = jdbcTemplate.query(
-                    "Select qid from QuizQuestion where qzid = '" + quizID + "'",
-                    (resultSet, n) -> resultSet.getString("qid")
-            );
-
-            HashMap<String, List<String>> studentAnswers = new HashMap<>();
-            for(QuestionSolution qs : request.getQuestionSolutions())
-                studentAnswers.put( qs.getQid(), qs.getAnswers() );
-
-            int xp = 0, tsp = 0;
-            for(String qid : questionIds){
-                List<String> answer = jdbcTemplate.query(
-                        "Select answer from Answer where qid = '" + qid + "'",
-                        (resultSet, n) -> resultSet.getString("answer")
-                );
-
-                List<String> studentAnswer = studentAnswers.get( qid );
-                if( isEqual( studentAnswer, answer ) ){
-                    List<Integer> points = jdbcTemplate.query(
-                            "Select points from Question where qid = '" + qid + "'",
-                            (resultSet, n) -> resultSet.getInt("points")
-                    );
-                    xp++;
-                    tsp += points.get(0);
-                }
-            }
-            //getting no of scores to calculate the score id
-            List<Integer> noOfScores = jdbcTemplate.query(
-                    "Select count(*) as count from Score",
-                    (res, n) -> res.getInt("count")
-            );
-            String scoreId = "SC" + decimalFormat.format( (noOfScores.isEmpty() ? 0 : noOfScores.get(0)) + 1);
-
-            //after calculating the xp, tsp and scoreId we add the score into score table
-            jdbcTemplate.execute(
-                    "Insert into Score (scid, xp, tsp) values ( '" + scoreId + "', " + xp + ", " + tsp + " )"
-            );
-
-            //now adding assign this score to the course in the StudentCourse table
-            jdbcTemplate.execute(
-                    "Update StudentCourse set scid = '" + scoreId + "' where sid = '" + request.getId() + "' and cid = '" + request.getCid() + "'"
-            );
-
-            return ResponseEntity.ok( new DefaultResponse("Student " + request.getId() + " has taken the quiz successfully and scored " + xp + " XP and " + tsp + " TSP."));
         }
         return (ResponseEntity) ResponseEntity.status(HttpStatus.FORBIDDEN);
     }
@@ -278,7 +241,7 @@ public class UserController {
 
         List<String> passwords = jdbcTemplate.query(
                 "Select password from Student where sid = '"+ id + "'",
-                (resultSet, rowNum) -> resultSet.getString("sid")
+                (resultSet, rowNum) -> resultSet.getString("password")
         );
 
         //if there is no student with this tid then return false

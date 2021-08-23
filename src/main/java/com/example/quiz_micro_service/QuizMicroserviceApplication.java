@@ -47,7 +47,7 @@ public class QuizMicroserviceApplication implements CommandLineRunner {
 		jdbcTemplate.execute( createLeaderboardTable );
 
 		//creating Quiz table if not exists
-		String createQuizTable = "Create table if not exists Quiz(qzid varchar(5), cutoff int, max_time int, max_points int)";
+		String createQuizTable = "Create table if not exists Quiz(qzid varchar(5), cutoff int, maxTime int, maxPoints int)";
 		jdbcTemplate.execute(createQuizTable);
 
 		//creating QuizQuestion table if not exists
@@ -64,11 +64,11 @@ public class QuizMicroserviceApplication implements CommandLineRunner {
 
 		//creating Option table if not exists
 		String createOptionTable = "Create table if not exists Option(qid varchar(5), option varchar(100))";
-		jdbcTemplate.execute( createAnswerTable );
+		jdbcTemplate.execute( createOptionTable );
 
 		//creating Tag table if not exists
-		String createTagTable = "Create table if not exists Answer(qid varchar(5), tag varchar(10), points int)";
-		jdbcTemplate.execute( createAnswerTable );
+		String createTagTable = "Create table if not exists Tag(qid varchar(5), tag varchar(10), points int)";
+		jdbcTemplate.execute( createTagTable );
 
 		System.out.println("running");
 	}

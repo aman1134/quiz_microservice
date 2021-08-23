@@ -4,6 +4,7 @@ import com.example.quiz_micro_service.request.DeleteResourceRequest;
 import com.example.quiz_micro_service.request.QuizQuestionRequest;
 import com.example.quiz_micro_service.request.QuizRequest;
 import com.example.quiz_micro_service.request.UpdateResourceRequest;
+import com.example.quiz_micro_service.response.DefaultErrorResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +22,7 @@ public class QuizzesController {
 
     @Autowired
     JdbcTemplate jdbcTemplate;
-    private final DecimalFormat decimalFormat = new DecimalFormat("###");
+    private final DecimalFormat decimalFormat = new DecimalFormat("000");
 
     @RequestMapping(value = "/quiz/add/", method = RequestMethod.POST)
     public ResponseEntity addQuiz(@RequestBody QuizRequest request){
@@ -37,12 +38,12 @@ public class QuizzesController {
 
             //create entry of a new quiz in Quiz table
             jdbcTemplate.execute(
-                    "Insert into Quiz (qzid, passingPoints, maxTime, maxPoints)"+
+                    "Insert into Quiz (qzid, cutOff, maxTime, maxPoints)"+
                             "values ('" + quizID + "', " + request.getCutOff() + ", " + request.getMaxTime() + ", " + request.getMaxPoints()+" )"
             );
             return ResponseEntity.ok( new com.example.quiz_microservice.response.DefaultResponse("new quiz added with qzid " + quizID));
         }
-        return (ResponseEntity) ResponseEntity.status(HttpStatus.FORBIDDEN);
+        return ResponseEntity.ok(new DefaultErrorResponse("You are not authorized."));
     }
 
     @RequestMapping(value = "/quiz/add-question/", method = RequestMethod.POST)
@@ -108,7 +109,7 @@ public class QuizzesController {
             );
 
             //if there is no record with qzid return not found http status
-            if(quizList.isEmpty())   return (ResponseEntity) ResponseEntity.status(HttpStatus.NOT_FOUND);
+            if(quizList.isEmpty())   return (ResponseEntity) ResponseEntity.ok( new DefaultErrorResponse("not found"));
 
             //if it contains a course with this qid then update the column with the new value
             jdbcTemplate.execute(
@@ -123,7 +124,7 @@ public class QuizzesController {
 
         List<String> passwords = jdbcTemplate.query(
                 "Select password from Teacher where tid = '"+ tid + "'",
-                (resultSet, rowNum) -> resultSet.getString("tid")
+                (resultSet, rowNum) -> resultSet.getString("password")
         );
 
         //if there is no teacher with this tid then return false
